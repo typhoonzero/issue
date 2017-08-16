@@ -6,19 +6,22 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/go-github/github"
 )
 
+const layout = "2017-08-16"
+
 func main() {
+	nowTime := time.Now()
+	today := time.Date(nowTime.Year(), nowTime.Month(), nowTime.Day(), 0, 0, 0, 0, nowTime.Location())
+
 	url := flag.String("repo", "https://github.com/PaddlePaddle/Paddle", "repo URL")
 	issues := flag.String("issues", "", "comma separated list of issues")
+	labels := flag.String("labels", "User", "comma separated labels to filter issues")
+	since := flag.String("since", today.Format(layout), "date to filter issues")
 	flag.Parse()
-
-	if *issues == "" {
-		flag.Usage()
-		return
-	}
 
 	ss := strings.Split(*url, "github.com/")
 	sp := strings.Split(ss[1], "/")
@@ -26,7 +29,29 @@ func main() {
 	repo := sp[1]
 
 	client := github.NewClient(nil)
-	is := strings.Split(*issues, ",")
+
+	var is []string
+	if *issues == "" {
+		opt := github.IssueListByRepoOptions{}
+		opt.Labels = strings.Split(*labels, ",")
+		if *since == "" {
+			opt.Since = today
+		} else {
+			t, _ := time.Parse(layout, *since)
+			opt.Since = t
+
+		}
+
+		issuesByTag, _, err := client.Issues.ListByRepo(context.TODO(), owner, repo, &opt)
+		if err != nil {
+			panic(err)
+		}
+		for _, i := range issuesByTag {
+			is = append(is, strconv.Itoa(i.GetNumber()))
+		}
+	} else {
+		is = strings.Split(*issues, ",")
+	}
 
 	var log string
 	waitFeedback := 0
